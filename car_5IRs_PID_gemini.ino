@@ -20,10 +20,10 @@ int sensorMax [NUM_SENSORS]; // Lectura máxima (negro)
 
 // === Variables para Histéresis de Detección de Línea ===
 int lineLostCounter = 0;
-const int LINE_LOST_THRESHOLD_COUNT = 5; // Considerar línea perdida después de N lecturas consecutivas sin detección
+const int LINE_LOST_THRESHOLD_COUNT = 20; // Considerar línea perdida después de N lecturas consecutivas sin detección
 
 // === Parámetros PID ===
-float Kp = 0.005;  // Ganancia Proporcional (AJUSTAR)
+float Kp = 0.035;  // Ganancia Proporcional (AJUSTAR) -  TO_DO LaMejor config puede que haya que bajar o subir un poco 
 float Ki = 0.005; // Ganancia Integral (AJUSTAR)
 float Kd = 0.00005;  // Ganancia Derivativa (AJUSTAR)
 
@@ -34,7 +34,7 @@ float derivative = 0;
 float pidOutput = 0;
 
 // === Parámetros de Velocidad de Motores ===
-int baseSpeed = 96; // Velocidad base de los motores (0-255) (AJUSTAR)
+int baseSpeed = 78; // Velocidad base de los motores (0-255) (AJUSTAR)
 int motorSpeedL = 0;
 int motorSpeedR = 0;
 
@@ -71,12 +71,35 @@ void setup() {
   {
     delay(1000); // Pausa antes de empezar
     Serial.println(" BLOCKED ");
+
+    /*/
     int position = readLinePosition();
     Serial.print(" readLinePosition(): ");
     Serial.println(position);
     // TO_DO TO_DEBUG 22:22:21.776 ->  readLinePosition(): 2333
     // TO_DO TO_DEBUG 22:22:21.776 ->  readLinePosition(): 1666
     // TO_DO TO_DEBUG 22:22:21.776 ->  readLinePosition(): 3500
+    */
+    Serial.println("");
+    int sensorValues[NUM_SENSORS];
+    for (int i = 0; i < NUM_SENSORS; i++) {
+    sensorValues[i] = 1023 - analogRead(sensorPins[i]);
+    }
+    Serial.print("analogRead sensorValues: ");
+    for (int i = 0; i < NUM_SENSORS; i++) {
+    Serial.print(sensorValues[i]);
+    Serial.print(" ");
+    }
+    
+    Serial.println("");
+    for (int i = 0; i < NUM_SENSORS; i++) {
+    sensorValues[i] = !digitalRead(sensorPins[i]) * 900;
+    }
+    Serial.print("digitalRead sensorValues: ");
+    for (int i = 0; i < NUM_SENSORS; i++) {
+    Serial.print(sensorValues[i]);
+    Serial.print(" ");
+    }
   }
   //delay(1000); // Pausa antes de empezar
 
@@ -100,7 +123,7 @@ void setup() {
   delay(1000);
   digitalWrite(LED_BUILTIN, LOW);   // turn the LED off by making the voltage LOW
 
-  Serial.println("Iniciando seguimiento...");
+  Serial.println("=> Iniciando seguimiento...");
 
 }
 
@@ -118,10 +141,13 @@ void loop() {
     lastError = 0; // O mantener el último error para intentar girar hacia él
     integral = 0;
     Serial.println("Linea perdida!");
+    boolean ledState = LOW; // Initial LED state (off)
     while (true)
     {
-      Serial.println(" LOOP - Linea perdida! - STOP");
-      delay(1000);
+      //Serial.println(" LOOP - Linea perdida! - STOP");
+      ledState = !ledState; // Toggle LED state
+      digitalWrite(LED_BUILTIN, ledState);
+      delay(150);
     }
     // Podría implementarse una estrategia de búsqueda aquí.
     // Por ahora, si se pierde la línea, el error será grande si position = 0 o 4000
@@ -156,13 +182,13 @@ void loop() {
   }
   
   // Imprimir valores para depuración (opcional, puede ralentizar el bucle)
-  
-  Serial.print("Pos: "); Serial.print(position);
+  /*
+  Serial.print(" (*) Pos: "); Serial.print(position);
   Serial.print(" Err: "); Serial.print(error);
   Serial.print(" PID: "); Serial.print(pidOutput);
   Serial.print(" L: "); Serial.print(motorSpeedL);
   Serial.print(" R: "); Serial.println(motorSpeedR);
-  
+  */
   delay(10); // Pequeño delay para estabilidad del bucle, ajustar o eliminar para max velocidad
   
   //Serial.println(" *** SACAR LONG DELAY *** "");
@@ -249,7 +275,8 @@ int OLD_readLinePosition() {
   for (int i = 0; i < NUM_SENSORS; i++) {
     // Leer valor crudo
     //int val = analogRead(sensorPins[i]);
-    int val = 1023 - analogRead(sensorPins[i]);
+    //int val = 1023 - analogRead(sensorPins[i]);
+    int val = !digitalRead(sensorPins[i]);
     
     // Normalizar el valor del sensor entre 0 y 1000
     // 0 = blanco perfecto, 1000 = negro perfecto (según calibración)
@@ -271,7 +298,7 @@ int OLD_readLinePosition() {
     Serial.print(sensorValues[i]);
     Serial.print(" ");
   }
-  Serial.print(" onLine: "); Serial.print(onLine);
+  Serial.print(" (#) onLine: "); Serial.print(onLine);
   Serial.print(" avg: "); Serial.print(avg);
   Serial.print(" sum: "); Serial.print(sum);
   Serial.print(" lastError: "); Serial.println(lastError);
@@ -299,9 +326,13 @@ int readLinePosition() {
   unsigned int sum = 0;  // Denominador para el promedio ponderado
 
   // Leer y calibrar cada sensor
+  //Serial.println("Leer y calibrar cada sensor.");
   for (int i = 0; i < NUM_SENSORS; i++) {
-    int rawValue = 1023 - analogRead(sensorPins[i]); // Lectura directa
-    
+    //int rawValue = 1023 - analogRead(sensorPins[i]); // Lectura directa
+    int rawValue = !digitalRead(sensorPins[i]) * 900;
+    //Serial.println("Lectura directa DONE.");
+
+
     // Normalizar el valor del sensor entre 0 y 1000
     // Ahora, 0 = blanco perfecto (sensorMin), 1000 = negro perfecto (sensorMax)
     // Los valores de sensorMin y sensorMax se obtienen de la calibración real.
